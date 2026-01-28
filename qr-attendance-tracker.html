@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Attendance Tracker - QR Check-in</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="Track staff attendance with QR code check-ins">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Attendance">
+    
+    <!-- Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="icon-192.svg">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="icon-192.svg">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        :root {
+            --bg: #fafafa;
+            --surface: #ffffff;
+            --primary: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --shadow: rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .header {
+            max-width: 1200px;
+            margin: 0 auto 32px;
+            background: var(--surface);
+            padding: 32px;
+            border-radius: 16px;
+            box-shadow: 0 1px 3px var(--shadow);
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .date-display {
+            font-family: 'Space Mono', monospace;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg);
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid var(--border);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            font-family: 'Space Mono', monospace;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-card.present .stat-value { color: var(--success); }
+        .stat-card.absent .stat-value { color: var(--danger); }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            gap: 24px;
+        }
+
+        .section {
+            background: var(--surface);
+            padding: 32px;
+            border-radius: 16px;
+            box-shadow: 0 1px 3px var(--shadow);
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .staff-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .staff-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px;
+            background: var(--bg);
+            border-radius: 12px;
+            border: 2px solid var(--border);
+            transition: all 0.3s ease;
+        }
+
+        .staff-card:hover {
+            border-color: var(--primary);
+            transform: translateX(4px);
+        }
+
+        .staff-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .staff-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--success));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .staff-details h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .staff-status {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .status-badge {
+            padding: 8px 16px;
+            border-radius: 100px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-badge::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-badge.present {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .status-badge.absent {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-family: 'IBM Plex Sans', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: var(--bg);
+            color: var(--text-primary);
+            border: 2px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--primary);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-family: 'IBM Plex Sans', sans-serif;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--surface);
+            padding: 32px;
+            border-radius: 16px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+        }
+
+        .qr-container {
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        .qr-code {
+            display: inline-block;
+            padding: 24px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px var(--shadow);
+            margin: 20px auto;
+        }
+
+        .qr-instructions {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.6;
+            margin-top: 16px;
+            text-align: left;
+            background: var(--bg);
+            padding: 16px;
+            border-radius: 8px;
+        }
+
+        .qr-instructions strong {
+            color: var(--text-primary);
+        }
+
+        .scanner-container {
+            text-align: center;
+        }
+
+        #reader {
+            max-width: 100%;
+            margin: 20px auto;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .alert {
+            padding: 16px;
+            border-radius: 8px;
+            margin: 16px 0;
+            font-size: 0.9rem;
+        }
+
+        .alert.success {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border: 2px solid var(--success);
+        }
+
+        .alert.error {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            border: 2px solid var(--danger);
+        }
+
+        .calendar-view {
+            margin-top: 16px;
+        }
+
+        .month-selector {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .month-selector button {
+            padding: 8px 16px;
+            border: 2px solid var(--border);
+            background: var(--surface);
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .month-name {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .calendar-day.header {
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .calendar-day.present {
+            background: var(--success);
+            color: white;
+        }
+
+        .calendar-day.absent {
+            background: var(--danger);
+            color: white;
+        }
+
+        .calendar-day.today {
+            border: 2px solid var(--primary);
+        }
+
+        @media (max-width: 768px) {
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .staff-card {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+
+            .staff-info {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📋 Staff Attendance Tracker</h1>
+        <div class="date-display" id="dateDisplay"></div>
+        
+        <div class="stats">
+            <div class="stat-card present">
+                <div class="stat-value" id="presentCount">0</div>
+                <div class="stat-label">Present Today</div>
+            </div>
+            <div class="stat-card absent">
+                <div class="stat-value" id="absentCount">0</div>
+                <div class="stat-label">Absent Today</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalStaff">0</div>
+                <div class="stat-label">Total Staff</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="section">
+            <div class="section-title">
+                <span>Current Status</span>
+            </div>
+            <div class="staff-grid" id="staffList"></div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">
+                <span>Quick Actions</span>
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-success" onclick="openScannerModal()">📷 Scan QR Code</button>
+                <button class="btn btn-primary" onclick="openAddStaffModal()">➕ Add Staff Member</button>
+                <button class="btn btn-secondary" onclick="exportData()">📥 Export Data</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Staff Modal -->
+    <div class="modal" id="addStaffModal">
+        <div class="modal-content">
+            <div class="modal-header">Add Staff Member</div>
+            <div class="form-group">
+                <label class="form-label">Name</label>
+                <input type="text" class="form-input" id="staffName" placeholder="Enter staff name">
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="addStaff()">Add</button>
+                <button class="btn btn-secondary" onclick="closeModal('addStaffModal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Code Modal -->
+    <div class="modal" id="qrModal">
+        <div class="modal-content">
+            <div class="modal-header" id="qrModalTitle">QR Code</div>
+            <div class="qr-container">
+                <div id="qrcode" class="qr-code"></div>
+                <div class="qr-instructions">
+                    <strong>How to use:</strong><br>
+                    1. Staff scans this QR code with their phone camera<br>
+                    2. They'll be automatically marked as present<br>
+                    3. Display this QR code at your workplace entrance<br>
+                    <br>
+                    <strong>Tip:</strong> Take a screenshot to print or display on a tablet!
+                </div>
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-secondary" onclick="closeModal('qrModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scanner Modal -->
+    <div class="modal" id="scannerModal">
+        <div class="modal-content">
+            <div class="modal-header">Scan QR Code to Check In</div>
+            <div id="scannerAlert"></div>
+            <div class="scanner-container">
+                <div id="reader"></div>
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-secondary" onclick="closeScannerModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar Modal -->
+    <div class="modal" id="calendarModal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header" id="calendarStaffName"></div>
+            <div class="month-selector">
+                <button onclick="changeMonth(-1)">←</button>
+                <div class="month-name" id="monthName"></div>
+                <button onclick="changeMonth(1)">→</button>
+            </div>
+            <div class="calendar" id="calendar"></div>
+            <div class="action-buttons" style="margin-top: 24px;">
+                <button class="btn btn-secondary" onclick="closeModal('calendarModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let staffMembers = [];
+        let attendance = {}; // { staffId: { 'YYYY-MM-DD': { present: true/false, time: timestamp } } }
+        let currentCalendarStaff = null;
+        let currentCalendarMonth = new Date();
+        let html5QrCode = null;
+
+        // Generate unique location code for this installation
+        let locationCode = localStorage.getItem('locationCode');
+        if (!locationCode) {
+            locationCode = 'LOC-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+            localStorage.setItem('locationCode', locationCode);
+        }
+
+        // Load data from localStorage
+        function loadData() {
+            const saved = localStorage.getItem('attendanceData');
+            if (saved) {
+                const data = JSON.parse(saved);
+                staffMembers = data.staffMembers || [];
+                attendance = data.attendance || {};
+            }
+            updateUI();
+        }
+
+        // Save data to localStorage
+        function saveData() {
+            localStorage.setItem('attendanceData', JSON.stringify({
+                staffMembers,
+                attendance
+            }));
+        }
+
+        // Update date display
+        function updateDateDisplay() {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('dateDisplay').textContent = now.toLocaleDateString('en-US', options);
+        }
+
+        // Get today's date string
+        function getTodayString() {
+            const now = new Date();
+            return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        }
+
+        // Add staff member
+        function addStaff() {
+            const name = document.getElementById('staffName').value.trim();
+            if (!name) {
+                alert('Please enter a name');
+                return;
+            }
+
+            const id = Date.now().toString();
+            staffMembers.push({ id, name });
+            attendance[id] = {};
+
+            document.getElementById('staffName').value = '';
+            closeModal('addStaffModal');
+            saveData();
+            updateUI();
+        }
+
+        // Toggle attendance
+        function toggleAttendance(staffId) {
+            const today = getTodayString();
+            if (!attendance[staffId]) {
+                attendance[staffId] = {};
+            }
+            
+            if (!attendance[staffId][today] || !attendance[staffId][today].present) {
+                // Mark as present with current time
+                attendance[staffId][today] = {
+                    present: true,
+                    time: Date.now()
+                };
+            } else {
+                // Mark as absent
+                attendance[staffId][today] = {
+                    present: false,
+                    time: null
+                };
+            }
+            
+            saveData();
+            updateUI();
+        }
+
+        // Remove staff
+        function removeStaff(staffId) {
+            if (confirm('Are you sure you want to remove this staff member?')) {
+                staffMembers = staffMembers.filter(s => s.id !== staffId);
+                delete attendance[staffId];
+                saveData();
+                updateUI();
+            }
+        }
+
+        // Show QR Code for staff member
+        function showQRCode(staffId) {
+            const staff = staffMembers.find(s => s.id === staffId);
+            if (!staff) return;
+
+            const qrData = JSON.stringify({
+                type: 'attendance_checkin',
+                location: locationCode,
+                staffId: staff.id,
+                staffName: staff.name
+            });
+
+            document.getElementById('qrModalTitle').textContent = `QR Code - ${staff.name}`;
+            
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = '';
+            
+            new QRCode(qrContainer, {
+                text: qrData,
+                width: 256,
+                height: 256,
+                colorDark: '#0f172a',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+
+            openModal('qrModal');
+        }
+
+        // Open scanner modal
+        function openScannerModal() {
+            openModal('scannerModal');
+            startScanner();
+        }
+
+        // Start QR scanner
+        function startScanner() {
+            const reader = document.getElementById('reader');
+            
+            html5QrCode = new Html5Qrcode("reader");
+            
+            html5QrCode.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 }
+                },
+                onScanSuccess,
+                onScanError
+            ).catch(err => {
+                console.error('Error starting scanner:', err);
+                showAlert('error', 'Unable to access camera. Please check permissions.');
+            });
+        }
+
+        // Handle successful scan
+        function onScanSuccess(decodedText, decodedResult) {
+            try {
+                const data = JSON.parse(decodedText);
+                
+                if (data.type !== 'attendance_checkin') {
+                    showAlert('error', 'Invalid QR code. Please scan a valid attendance QR code.');
+                    return;
+                }
+
+                if (data.location !== locationCode) {
+                    showAlert('error', 'This QR code is for a different location.');
+                    return;
+                }
+
+                const staff = staffMembers.find(s => s.id === data.staffId);
+                if (!staff) {
+                    showAlert('error', 'Staff member not found.');
+                    return;
+                }
+
+                // Mark as present with check-in time
+                const today = getTodayString();
+                const checkInTime = Date.now();
+                
+                if (!attendance[data.staffId]) {
+                    attendance[data.staffId] = {};
+                }
+                attendance[data.staffId][today] = {
+                    present: true,
+                    time: checkInTime
+                };
+                
+                saveData();
+                updateUI();
+
+                const timeStr = new Date(checkInTime).toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: true 
+                });
+                showAlert('success', `✓ ${staff.name} checked in at ${timeStr}`);
+                
+                // Stop scanner after successful scan
+                setTimeout(() => {
+                    closeScannerModal();
+                }, 2000);
+
+            } catch (err) {
+                showAlert('error', 'Invalid QR code format.');
+            }
+        }
+
+        // Handle scan errors (silent - happens during scanning)
+        function onScanError(errorMessage) {
+            // Silent - scanning errors are normal
+        }
+
+        // Show alert in scanner modal
+        function showAlert(type, message) {
+            const alertDiv = document.getElementById('scannerAlert');
+            alertDiv.innerHTML = `<div class="alert ${type}">${message}</div>`;
+        }
+
+        // Close scanner modal
+        function closeScannerModal() {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    html5QrCode = null;
+                    closeModal('scannerModal');
+                    document.getElementById('scannerAlert').innerHTML = '';
+                }).catch(err => {
+                    console.error('Error stopping scanner:', err);
+                });
+            } else {
+                closeModal('scannerModal');
+            }
+        }
+
+        // Update UI
+        function updateUI() {
+            const today = getTodayString();
+            const staffList = document.getElementById('staffList');
+            
+            let presentCount = 0;
+            let absentCount = 0;
+
+            staffList.innerHTML = staffMembers.map(staff => {
+                const dayData = attendance[staff.id]?.[today];
+                const isPresent = dayData?.present || false;
+                const checkInTime = dayData?.time;
+                
+                if (isPresent) presentCount++;
+                else absentCount++;
+
+                const initials = staff.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                
+                let timeDisplay = '';
+                if (isPresent && checkInTime) {
+                    const time = new Date(checkInTime);
+                    const timeStr = time.toLocaleTimeString('en-US', { 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        hour12: true 
+                    });
+                    timeDisplay = `<div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px;">Checked in: ${timeStr}</div>`;
+                }
+                
+                return `
+                    <div class="staff-card">
+                        <div class="staff-info">
+                            <div class="staff-avatar">${initials}</div>
+                            <div class="staff-details">
+                                <h3>${staff.name}</h3>
+                                <div class="staff-status">
+                                    <span class="status-badge ${isPresent ? 'present' : 'absent'}">
+                                        ${isPresent ? 'Present' : 'Absent'}
+                                    </span>
+                                    ${timeDisplay}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="btn btn-success" onclick="showQRCode('${staff.id}')">
+                                Show QR
+                            </button>
+                            <button class="btn btn-primary" onclick="toggleAttendance('${staff.id}')">
+                                Mark ${isPresent ? 'Absent' : 'Present'}
+                            </button>
+                            <button class="btn btn-secondary" onclick="viewCalendar('${staff.id}')">
+                                History
+                            </button>
+                            <button class="btn btn-danger" onclick="removeStaff('${staff.id}')">
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            if (staffMembers.length === 0) {
+                staffList.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 40px;">No staff members added yet. Click "Add Staff Member" to get started.</div>';
+            }
+
+            document.getElementById('presentCount').textContent = presentCount;
+            document.getElementById('absentCount').textContent = absentCount;
+            document.getElementById('totalStaff').textContent = staffMembers.length;
+        }
+
+        // View calendar
+        function viewCalendar(staffId) {
+            currentCalendarStaff = staffId;
+            currentCalendarMonth = new Date();
+            const staff = staffMembers.find(s => s.id === staffId);
+            document.getElementById('calendarStaffName').textContent = `${staff.name}'s Attendance`;
+            renderCalendar();
+            openModal('calendarModal');
+        }
+
+        // Render calendar
+        function renderCalendar() {
+            const calendar = document.getElementById('calendar');
+            const year = currentCalendarMonth.getFullYear();
+            const month = currentCalendarMonth.getMonth();
+            
+            document.getElementById('monthName').textContent = 
+                currentCalendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const today = getTodayString();
+
+            let html = '';
+            
+            // Day headers
+            ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(day => {
+                html += `<div class="calendar-day header">${day}</div>`;
+            });
+
+            // Empty cells before first day
+            for (let i = 0; i < firstDay; i++) {
+                html += '<div class="calendar-day"></div>';
+            }
+
+            // Days of month
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayData = attendance[currentCalendarStaff]?.[dateStr];
+                const isPresent = dayData?.present;
+                const checkInTime = dayData?.time;
+                const isToday = dateStr === today;
+                
+                let className = 'calendar-day';
+                if (isPresent === true) className += ' present';
+                else if (isPresent === false) className += ' absent';
+                if (isToday) className += ' today';
+                
+                let title = '';
+                if (isPresent && checkInTime) {
+                    const time = new Date(checkInTime);
+                    const timeStr = time.toLocaleTimeString('en-US', { 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        hour12: true 
+                    });
+                    title = `title="Checked in: ${timeStr}"`;
+                }
+                
+                html += `<div class="${className}" ${title}>${day}</div>`;
+            }
+
+            calendar.innerHTML = html;
+        }
+
+        // Change month
+        function changeMonth(delta) {
+            currentCalendarMonth.setMonth(currentCalendarMonth.getMonth() + delta);
+            renderCalendar();
+        }
+
+        // Modal functions
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        function openAddStaffModal() {
+            openModal('addStaffModal');
+        }
+
+        // Export data
+        function exportData() {
+            const today = new Date();
+            const monthYear = today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            
+            let csv = `Staff Attendance Report - ${monthYear}\n\n`;
+            csv += 'Name,Date,Status,Check-in Time\n';
+
+            staffMembers.forEach(staff => {
+                const staffAttendance = attendance[staff.id] || {};
+                const dates = Object.keys(staffAttendance).sort();
+                
+                dates.forEach(date => {
+                    const dayData = staffAttendance[date];
+                    const status = dayData?.present ? 'Present' : 'Absent';
+                    
+                    let timeStr = '-';
+                    if (dayData?.present && dayData?.time) {
+                        const time = new Date(dayData.time);
+                        timeStr = time.toLocaleTimeString('en-US', { 
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                            hour12: true 
+                        });
+                    }
+                    
+                    csv += `${staff.name},${date},${status},${timeStr}\n`;
+                });
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `attendance-${today.toISOString().split('T')[0]}.csv`;
+            a.click();
+        }
+
+        // Initialize
+        loadData();
+        updateDateDisplay();
+        setInterval(updateDateDisplay, 60000); // Update every minute
+
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registered:', registration.scope);
+                    })
+                    .catch(err => {
+                        console.log('ServiceWorker registration failed:', err);
+                    });
+            });
+        }
+
+        // PWA Install prompt
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            
+            // Show install button/banner if desired
+            console.log('PWA install available');
+        });
+    </script>
+</body>
+</html>
